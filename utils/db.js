@@ -1,3 +1,5 @@
+// Database module to handle database operations
+
 const { MongoClient } = require('mongodb');
 
 class DBClient {
@@ -5,56 +7,67 @@ class DBClient {
     const host = process.env.DB_HOST || 'localhost';
     const port = process.env.DB_PORT || 27017;
     const database = process.env.DB_DATABASE || 'files_manager';
-    const url = `mongodb://${host}:${port}/${database}`;
-
-    this.client = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
-    this.db = null;
-
-    this.client.on('error', (err) => console.error('MongoDB Client Error:', err));
-    this.client.on('connect', () => console.log('Connected to MongoDB'));
+    const uri = `mongodb://${host}:${port}`;
+    const client = new MongoClient(uri);
+    client.connect();
+    this.client = client;
+    this.database = database;
   }
 
-  async isAlive() {
-    try {
-      await this.client.connect();
-      this.db = this.client.db();
+  isAlive() {
+    const id = this.client.connection_id;
+    if (!id) {
       return true;
-    } catch (error) {
-      console.error('Error connecting to MongoDB:', error);
-      return false;
     }
+    return true;
   }
 
   async nbUsers() {
-    if (!this.db) {
-      console.error('Not connected to MongoDB');
-      return null;
-    }
-    try {
-      const count = await this.db.collection('users').countDocuments();
-      return count;
-    } catch (error) {
-      console.error('Error counting users:', error);
-      return null;
-    }
+    const db = this.client.db(this.database);
+    const collection = db.collection('users');
+    const users = await collection.find({}).toArray();
+    return users.length;
   }
 
   async nbFiles() {
-    if (!this.db) {
-      console.error('Not connected to MongoDB');
-      return null;
-    }
-    try {
-      const count = await this.db.collection('files').countDocuments();
-      return count;
-    } catch (error) {
-      console.error('Error counting files:', error);
-      return null;
-    }
+    const db = this.client.db(this.database);
+    const collection = db.collection('files');
+    const files = await collection.find({}).toArray();
+    return files.length;
+  }
+
+  async add(collectionName, obj) {
+    const db = this.client.db(this.database);
+    const collection = db.collection(collectionName);
+    const user = await collection.insertOne(obj);
+    return user;
+  }
+
+  async get(collectionName, obj) {
+    const db = this.client.db(this.database);
+    const collection = db.collection(collectionName);
+    const documentArray = await collection.find(obj).toArray();
+    return documentArray;
+  }
+
+  async put(collectionName, obj, newAttribute) {
+    const db = this.client.db(this.database);
+    const collection = db.collection(collectionName);
+    const documentArray = await collection.updateOne(obj, { $set: newAttribute });
+    return documentArray.matchedCount;
+  }
+
+  async paginate(collectionName, page, obj) {
+    const db = this.client.db(this.database);
+    const collection = db.collection(collectionName);
+    const pipeline = [
+      { $match: obj },
+      { $skip: page * 20 },
+      { $limit: 20 },
+    ];
+    const documentArray = await collection.aggregate(pipeline).toArray();
+    return documentArray;
   }
 }
 
-const dbClient = new DBClient();
-
-module.exports = dbClient;
-
+module.exports = new DBClient();

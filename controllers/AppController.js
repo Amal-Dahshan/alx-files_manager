@@ -1,25 +1,20 @@
-const dbClient = require('../db');
-const redisClient = require('../redis');
+// Logic for endpoints
+
+const redisClient = require('../utils/redis');
+const dbClient = require('../utils/db');
 
 class AppController {
-  static async getStatus(req, res) {
-    const isRedisAlive = redisClient.isAlive();
-    const isDbAlive = await dbClient.isAlive();
-
-    res.status(200).json({ redis: isRedisAlive, db: isDbAlive });
+  getStatus(req, res) {
+    this.dbStatus = dbClient.isAlive();
+    this.redisStatus = redisClient.isAlive();
+    res.status(200).send({ redis: this.redisStatus, db: this.dbStatus });
   }
 
-  static async getStats(req, res) {
-    const nbUsers = await dbClient.nbUsers();
-    const nbFiles = await dbClient.nbFiles();
-
-    if (nbUsers === null || nbFiles === null) {
-      return res.status(500).json({ message: 'Error retrieving stats' });
-    }
-
-    res.status(200).json({ users: nbUsers, files: nbFiles });
+  async getStats(req, res) {
+    this.users = await dbClient.nbUsers();
+    this.files = await dbClient.nbFiles();
+    res.status(200).send({ users: this.users, files: this.files });
   }
 }
 
-module.exports = AppController;
-
+module.exports = new AppController();

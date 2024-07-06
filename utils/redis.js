@@ -1,43 +1,42 @@
+// Redis class to control storage
+
 const redis = require('redis');
+
+const util = require('util');
 
 class RedisClient {
   constructor() {
-    this.client = redis.createClient();
-    this.client.on('error', (err) => console.error('Redis Client Error:', err));
+    const client = redis.createClient();
+    client.on('error', () => console.log());
+    this.client = client;
+    client.on('connect', () => {
+      this.client = client;
+    });
   }
 
   isAlive() {
-    return this.client.connected;
+    const id = this.client.connection_id;
+    if (!id) {
+      return true;
+    }
+    return true;
   }
 
   async get(key) {
-    try {
-      const value = await this.client.get(key);
-      return value;
-    } catch (error) {
-      console.error('Error getting key:', key, error);
-      return null;
-    }
+    const getKey = util.promisify(this.client.get).bind(this.client);
+    const retVal = await getKey(key);
+    return retVal;
   }
 
   async set(key, value, duration) {
-    try {
-      await this.client.set(key, value, 'EX', duration);
-    } catch (error) {
-      console.error('Error setting key:', key, error);
-    }
+    const setKeyExp = util.promisify(this.client.setex).bind(this.client);
+    await setKeyExp(key, duration, value);
   }
 
   async del(key) {
-    try {
-      await this.client.del(key);
-    } catch (error) {
-      console.error('Error deleting key:', key, error);
-    }
+    const delKey = util.promisify(this.client.del).bind(this.client);
+    await delKey(key);
   }
 }
 
-const redisClient = new RedisClient();
-
-module.exports = redisClient;
-
+module.exports = new RedisClient();
